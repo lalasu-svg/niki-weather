@@ -17,7 +17,7 @@ handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 def get_weather_report(location_name):
     # 這行已經徹底拋棄 cwa.gov.tw，換成官方 100% 正確的開放資料接口網址
-    url = "https://cwa.gov.tw"
+    url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001"
     params = {"Authorization": CWA_API_KEY, "locationName": location_name}
     try:
         response = requests.get(url, params=params)
