@@ -30,9 +30,14 @@ def get_weather_report(location_name):
         
         # 解析氣象元素
         weather_elements = {}
-        for el in location_data["weatherElement"]:
-            # 抓取未來 12 小時的第一個預報時段
-            weather_elements[el["elementName"]] = el["time"][0]["parameter"]["parameterName"]
+        # 替換成全新的防錯相容程式碼
+for el in location_data["weatherElement"]:
+    try:
+        # 有些時段的資料結構在 time 裡面是陣列，我們加上 [0] 確保相容性
+        weather_elements[el["elementName"]] = el["time"][0]["parameter"]["parameterName"]
+    except:
+        # 如果不是陣列，就用原本的方式讀取，確保絕對不報錯
+        weather_elements[el["elementName"]] = el["time"]["parameter"]["parameterName"]
         
         weather_state = weather_elements.get("Wx", "未知")
         rain_chance = weather_elements.get("PoP", "0")
