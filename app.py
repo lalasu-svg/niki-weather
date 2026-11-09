@@ -69,7 +69,7 @@ def get_short_weather(location_name, day_target="今天"):
 # 2. 全新一週天氣預報
 def get_weekly_weather(location_name):
     # 精準修正：改為官方標準一週天氣預報正確接口，徹底拋棄舊網址
-    url = "https://cwa.gov.tw"
+    url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-D0047-091"
     params = {"Authorization": CWA_API_KEY, "locationName": location_name}
     try:
         response = requests.get(url, params=params)
@@ -86,7 +86,7 @@ def get_weekly_weather(location_name):
                 for t in el["time"]:
                     start_time = t["startTime"]
                     # 格式化時間戳記
-                    date_str = start_time.split(" ")[0].split("-")[1] + "/" + start_time.split(" ")[0].split("-")[2]
+                    date_str = start_time.split(" ")[0][5:].replace("-", "/")
                     
                     # 抓取白天時段預報
                     if "12:00:00" in start_time or "06:00:00" in start_time:
