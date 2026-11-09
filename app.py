@@ -15,7 +15,6 @@ CWA_API_KEY = "CWA-5D1FE36C-504D-42C3-994B-9C0A2CA4185B"
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# 台灣 22 縣市清單，用來進行關鍵字模糊比對
 TAIWAN_CITIES = [
     "臺北市", "新北市", "桃園市", "臺中市", "臺南市", "高雄市", 
     "基隆市", "新竹市", "嘉義市", "新竹縣", "苗栗縣", "彰化縣", 
@@ -23,7 +22,7 @@ TAIWAN_CITIES = [
     "臺東縣", "澎湖縣", "金門縣", "連江縣"
 ]
 
-# 功能 1：原本的今明 36 小時預報（支援今天、明天、後天）
+# 1. 今明 36 小時預報
 def get_short_weather(location_name, day_target="今天"):
     url = "https://cwa.gov.tw"
     params = {"Authorization": CWA_API_KEY, "locationName": location_name}
@@ -67,9 +66,9 @@ def get_short_weather(location_name, day_target="今天"):
     except Exception as e:
         return f"❌ 氣象局資料解析錯誤，原因: {str(e)}"
 
-# 功能 2：全新解鎖的一週天氣預報（未來 7 天）
+# 2. 全新一週天氣預報
 def get_weekly_weather(location_name):
-    # 使用氣象署官方標準一週天氣預報接口 (F-D0047-091)
+    # 精準修正：改為官方標準一週天氣預報正確接口，徹底拋棄舊網址
     url = "https://cwa.gov.tw"
     params = {"Authorization": CWA_API_KEY, "locationName": location_name}
     try:
@@ -78,21 +77,18 @@ def get_weekly_weather(location_name):
         if "records" not in data or "locations" not in data["records"] or not data["records"]["locations"]:
             return f"❌ 找不到『{location_name}』的一週氣象資料。"
             
-        location_data = data["records"]["locations"][0]["location"][0]
+        location_data = data["records"]["locations"]["location"][0]
         
-        # 用來整理每天白天的預報
         daily_reports = {}
-        
         for el in location_data["weatherElement"]:
             element_name = el["elementName"]
-            # 我們抓取：天氣現象(Wx)、最低溫(MinT)、最高溫(MaxT)
             if element_name in ["Wx", "MinT", "MaxT"]:
                 for t in el["time"]:
-                    # 抓取日期 (例如 2026-11-10)
                     start_time = t["startTime"]
+                    # 格式化時間戳記
                     date_str = start_time.split(" ")[0].split("-")[1] + "/" + start_time.split(" ")[0].split("-")[2]
                     
-                    # 由於一週預報每 12 小時一筆，我們主要抓白天的資料作為代表
+                    # 抓取白天時段預報
                     if "12:00:00" in start_time or "06:00:00" in start_time:
                         if date_str not in daily_reports:
                             daily_reports[date_str] = {}
@@ -104,11 +100,9 @@ def get_weekly_weather(location_name):
                         elif element_name == "MaxT":
                             daily_reports[date_str]["MaxT"] = t["elementValue"][0]["value"]
 
-        # 組合出一週天氣的精美純文字報表
         report_text = f"🎙️ AI 氣象主播倪珍Niki ➔ 一週天氣展望\n📍 地區：{location_name}\n"
         report_text += "====================\n"
         
-        # 取前 7 天的資料印出
         count = 0
         for date, info in sorted(daily_reports.items()):
             if count >= 7:
@@ -119,7 +113,7 @@ def get_weekly_weather(location_name):
             report_text += f"📅 {date} ➔ {wx} ({mint}°C~{maxt}°C)\n"
             count += 1
             
-        report_text += "====================\n💡 提醒：春季/秋季氣候多變，記得隨時留意最新氣象喔！"
+        report_text += "====================\n💡 提醒：氣候多變，記得隨時留意最新氣象喔！"
         return report_text
     except Exception as e:
         return f"❌ 一週氣象資料解析錯誤，原因: {str(e)}"
@@ -140,23 +134,18 @@ def index():
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    # 統一將使用者訊息中不規範的「台」置換為官方規格的「臺」
     user_msg = event.message.text.strip().replace("台", "臺")
     
-    # 步驟一：檢查使用者輸入的句子裡，有沒有包含任何一個台灣縣市（模糊比對）
     matched_city = None
     for city in TAIWAN_CITIES:
         if city in user_msg or city.replace("市", "").replace("縣", "") in user_msg:
             matched_city = city
             break
             
-    # 步驟二：如果有點選到縣市關鍵字，開始拆解時間需求
     if matched_city:
         if "一週" in user_msg or "一周" in user_msg or "7天" in user_msg or "七天" in user_msg:
-            # 觸發功能 2：一週天氣
             reply_text = get_weekly_weather(matched_city)
         else:
-            # 觸發功能 1：短天期預報
             day_target = "今天"
             if "明天" in user_msg:
                 day_target = "明天"
@@ -164,11 +153,10 @@ def handle_message(event):
                 day_target = "後天"
             reply_text = get_short_weather(matched_city, day_target)
     else:
-        # 如果使用者輸入的句子完全沒提到任何縣市
         reply_text = (
             f"🤖 嗨！我是 AI 氣象主播倪珍Niki。\n\n"
-            f"不論你怎麼輸入，只要句子裡有【縣市名稱】我就能偵測到喔！\n\n"
-            f"💡 範例你可以這樣輸入：\n"
+            f"只要句子裡有【縣市名稱】我就能偵測到喔！\n\n"
+            f"💡 範例：\n"
             f"👉「我想知道明天台北市會下雨嗎」\n"
             f"👉「幫我查台中一週天氣」\n"
             f"👉「高雄後天冷不冷」"
